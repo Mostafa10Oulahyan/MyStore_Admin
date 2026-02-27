@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { Search, Mail, Phone, Calendar } from 'lucide-react'
 import { cn } from '../lib/utils'
+import { useUser } from '@clerk/clerk-react'
 
 export default function Users() {
+    const { user: currentUser } = useUser()
     const [users, setUsers] = useState([])
     const [loading, setLoading] = useState(true)
     const [searchTerm, setSearchTerm] = useState('')
@@ -27,10 +29,18 @@ export default function Users() {
         setLoading(false)
     }
 
-    const filteredUsers = users.filter(user =>
-        (user.first_name + ' ' + user.last_name).toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.email?.toLowerCase().includes(searchTerm.toLowerCase())
-    )
+    const adminEmail = currentUser?.primaryEmailAddress?.emailAddress
+
+    // Filter out the currently logged-in Admin, and filter by search term
+    const filteredUsers = users.filter(usr => {
+        // Exclude admin
+        if (adminEmail && usr.email === adminEmail) return false;
+
+        const matchesSearch = (usr.first_name + ' ' + usr.last_name).toLowerCase().includes(searchTerm.toLowerCase()) ||
+            usr.email?.toLowerCase().includes(searchTerm.toLowerCase())
+
+        return matchesSearch
+    })
 
     return (
         <div className="space-y-6">

@@ -23,10 +23,12 @@ export default function App() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/products" element={<Products />} />
         <Route path="/products/new" element={<ProductForm />} />
+        <Route path="/products/:id/edit" element={<ProductForm />} />
         <Route path="/orders" element={<Orders />} />
         <Route path="/orders/:id" element={<OrderDetails />} />
         <Route path="/categories" element={<Categories />} />
         <Route path="/categories/new" element={<CategoryForm />} />
+        <Route path="/categories/:id/edit" element={<CategoryForm />} />
         <Route path="/users" element={<Users />} />
       </Route>
 
