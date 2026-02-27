@@ -361,7 +361,7 @@ export default function ProductForm() {
                     const { error: uploadError } = await supabase.storage.from('product-images').upload(fileName, file)
 
                     if (uploadError) {
-                        console.error('Error uploading image:', uploadError)
+                        console.error('Error uploading image :', uploadError)
                         throw new Error(`Failed to upload image ${file.name}: ${uploadError.message}`)
                     }
 
