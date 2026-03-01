@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { Link } from 'react-router-dom'
+import { useUser } from '@clerk/clerk-react'
 import {
     Package, ShoppingCart, Users as UsersIcon, DollarSign, TrendingUp, Plus,
     Eye, ArrowRight, Star, AlertTriangle, Layers, Box, Tag, Clock,
@@ -56,12 +57,13 @@ function MiniBarChart({ data, maxVal }) {
 }
 
 export default function Dashboard() {
+    const { user: currentUser } = useUser()
     const [loading, setLoading] = useState(true)
     const [data, setData] = useState({
         revenue: 0,
         ordersCount: 0,
         productsCount: 0,
-        usersCount: 0,
+        users: [],
         categoriesCount: 0,
         reviewsCount: 0,
         avgRating: 0,
@@ -101,7 +103,7 @@ export default function Dashboard() {
             ] = await Promise.all([
                 supabase.from('orders').select('total_amount, status'),
                 supabase.from('products').select('status, category_id, categories(name)'),
-                supabase.from('users').select('*', { count: 'exact', head: true }),
+                supabase.from('users').select('email'),
                 supabase.from('categories').select('id, name, is_active'),
                 supabase.from('reviews').select('rating'),
                 supabase.from('product_variants').select('stock_quantity, is_available'),
@@ -114,8 +116,10 @@ export default function Dashboard() {
             const reviews = reviewsRes.data || []
             const variants = variantsRes.data || []
 
-            // Revenue
-            const revenue = orders.reduce((s, o) => s + (parseFloat(o.total_amount) || 0), 0)
+            // Revenue (Only for delivered orders)
+            const revenue = orders
+                .filter(o => o.status === 'delivered')
+                .reduce((s, o) => s + (parseFloat(o.total_amount) || 0), 0)
 
             // Order statuses
             const ordersByStatus = { pending: 0, confirmed: 0, delivered: 0, rejected: 0, cancelled: 0 }
@@ -145,7 +149,7 @@ export default function Dashboard() {
                 revenue,
                 ordersCount: orders.length,
                 productsCount: products.length,
-                usersCount: usersRes.count || 0,
+                users: usersRes.data || [],
                 categoriesCount: (categoriesRes.data || []).length,
                 reviewsCount: reviews.length,
                 avgRating,
@@ -178,6 +182,8 @@ export default function Dashboard() {
 
     const totalOrders = data.ordersCount || 1
     const totalProducts = data.productsCount || 1
+
+    const usersCount = (data.users || []).filter(u => u.email !== currentUser?.primaryEmailAddress?.emailAddress).length
 
     // Order status pipeline config
     const orderPipeline = [
@@ -227,7 +233,7 @@ export default function Dashboard() {
                     <div className="flex items-center justify-between relative">
                         <div>
                             <p className="text-xs font-semibold uppercase tracking-wider text-emerald-400/80">Revenue</p>
-                            <p className="text-2xl font-bold text-emerald-400 mt-1">${data.revenue.toFixed(0)}</p>
+                            <p className="text-2xl font-bold text-emerald-400 mt-1">{data.revenue.toFixed(0)} MAD</p>
                             <p className="text-[10px] text-gray-500 mt-1">{data.ordersCount} orders total</p>
                         </div>
                         <div className="p-2.5 bg-emerald-500/10 rounded-xl">
@@ -272,7 +278,7 @@ export default function Dashboard() {
                     <div className="flex items-center justify-between relative">
                         <div>
                             <p className="text-xs font-semibold uppercase tracking-wider text-orange-400/80">Customers</p>
-                            <p className="text-2xl font-bold text-orange-400 mt-1">{data.usersCount}</p>
+                            <p className="text-2xl font-bold text-orange-400 mt-1">{usersCount}</p>
                             <p className="text-[10px] text-gray-500 mt-1">{data.reviewsCount} reviews ({data.avgRating.toFixed(1)} ★)</p>
                         </div>
                         <div className="p-2.5 bg-orange-500/10 rounded-xl">
@@ -475,7 +481,7 @@ export default function Dashboard() {
                             </div>
                             <div>
                                 <p className="text-sm font-medium text-gray-900 dark:text-white">Manage Users</p>
-                                <p className="text-[10px] text-gray-500">{data.usersCount} registered customers</p>
+                                <p className="text-[10px] text-gray-500">{usersCount} registered customers</p>
                             </div>
                         </Link>
                     </div>
@@ -553,7 +559,7 @@ export default function Dashboard() {
                             { label: 'Product Types', value: data.productTypes.length, icon: Layers, color: 'text-indigo-500' },
                             { label: 'Total Reviews', value: data.reviewsCount, icon: Star, color: 'text-amber-500' },
                             { label: 'Avg Rating', value: `${data.avgRating.toFixed(1)} ★`, icon: Star, color: 'text-yellow-500' },
-                            { label: 'Avg Order Value', value: `$${data.ordersCount ? (data.revenue / data.ordersCount).toFixed(0) : 0}`, icon: DollarSign, color: 'text-emerald-500' },
+                            { label: 'Avg Order Value', value: `${data.ordersCount ? (data.revenue / data.ordersCount).toFixed(0) : 0} MAD`, icon: DollarSign, color: 'text-emerald-500' },
                         ].map(item => {
                             const Icon = item.icon
                             return (

@@ -87,7 +87,23 @@ function VariantRow({ variant, index, onChange, onRemove }) {
                 <label className="block text-[10px] text-gray-500 uppercase tracking-wider mb-1">Color *</label>
                 <div className="flex items-center gap-1">
                     <input
-                        type="text" value={variant.color} onChange={e => update('color', e.target.value)} required
+                        type="text"
+                        value={variant.color}
+                        onChange={e => {
+                            const val = e.target.value;
+                            // Auto-normalize: "blue" -> "Blue" while typing looks weird, so we capitalize 
+                            // but let user type. Normalization happens better onBlur or via suggestions.
+                            update('color', val);
+                        }}
+                        onBlur={e => {
+                            const val = e.target.value.trim();
+                            if (val) {
+                                const normalized = val.charAt(0).toUpperCase() + val.slice(1).toLowerCase();
+                                update('color', normalized);
+                            }
+                        }}
+                        list="existing-colors"
+                        required
                         placeholder="Blue" className="w-full rounded border border-gray-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-900 dark:border-gray-700"
                     />
                 </div>
@@ -655,6 +671,13 @@ export default function ProductForm() {
                     setFormData(prev => ({ ...prev, product_type_id: newType.id }))
                 }}
             />
+
+            {/* Color Suggestions Datalist */}
+            <datalist id="existing-colors">
+                {[...new Set(variants.map(v => v.color).filter(Boolean))].map(c => (
+                    <option key={c} value={c} />
+                ))}
+            </datalist>
         </div>
     )
 }

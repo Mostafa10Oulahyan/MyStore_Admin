@@ -236,7 +236,7 @@ export default function Orders() {
                                                 {order.customer_first_name} {order.customer_last_name}
                                             </td>
                                             <td className="px-6 py-4 font-semibold text-gray-900 dark:text-white">
-                                                ${parseFloat(order.total_amount).toFixed(2)}
+                                                {parseFloat(order.total_amount).toFixed(2)} MAD
                                             </td>
                                             <td className="px-6 py-4">
                                                 <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 uppercase">

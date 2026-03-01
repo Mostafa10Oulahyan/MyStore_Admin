@@ -273,7 +273,7 @@ export default function Products() {
                                                 </span>
                                             </td>
                                             <td className="px-5 py-4 font-semibold text-gray-900 dark:text-white">
-                                                ${product.base_price}
+                                                {product.base_price} MAD
                                             </td>
                                             <td className="px-5 py-4">
                                                 {vs.count > 0 ? (
@@ -392,11 +392,11 @@ export default function Products() {
                                     </div>
                                     <div>
                                         <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Base Price</p>
-                                        <p className="text-lg font-bold text-emerald-500">${p.base_price}</p>
+                                        <p className="text-lg font-bold text-emerald-500">{p.base_price} MAD</p>
                                     </div>
                                     <div>
                                         <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Compare Price</p>
-                                        <p className="text-sm text-gray-500 line-through">{p.compare_at_price ? `$${p.compare_at_price}` : '-'}</p>
+                                        <p className="text-sm text-gray-500 line-through">{p.compare_at_price ? `${p.compare_at_price} MAD` : '-'}</p>
                                     </div>
                                     <div>
                                         <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Status</p>
@@ -467,7 +467,7 @@ export default function Products() {
                                                             </td>
                                                             <td className="px-3 py-2 font-mono text-gray-500">{v.sku || '-'}</td>
                                                             <td className="px-3 py-2 text-right font-semibold text-gray-700 dark:text-gray-300">
-                                                                {v.price ? `$${v.price}` : '-'}
+                                                                {v.price ? `${v.price} MAD` : '-'}
                                                             </td>
                                                             <td className="px-3 py-2 text-right">
                                                                 <span className={cn(

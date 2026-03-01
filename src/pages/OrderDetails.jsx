@@ -12,8 +12,8 @@ const statusConfig = {
     cancelled: { icon: Ban, color: 'text-gray-400', bg: 'bg-gray-400', label: 'Cancelled' },
 }
 
-// Build timeline steps from order timestamps
-function buildTimeline(order) {
+// Build timeline steps from order timestamps and history
+function buildTimeline(order, history = []) {
     if (!order) return []
 
     const steps = []
@@ -30,15 +30,22 @@ function buildTimeline(order) {
         done: true,
     })
 
+    // Map history entries to steps
+    const historyMap = {}
+    history.forEach(h => {
+        historyMap[h.status] = h
+    })
+
     // Normal flow: Pending → Confirmed → Delivered
     // Or: Rejected / Cancelled
 
     if (order.status === 'rejected') {
+        const h = historyMap.rejected
         steps.push({
             key: 'rejected',
             label: 'Rejected',
-            description: 'Order was rejected',
-            time: order.rejected_at || order.updated_at,
+            description: h?.notes || 'Order was rejected by administrator',
+            time: h?.created_at || order.rejected_at || order.updated_at,
             icon: XCircle,
             color: 'text-red-500',
             bg: 'bg-red-500',
@@ -48,11 +55,12 @@ function buildTimeline(order) {
     }
 
     if (order.status === 'cancelled') {
+        const h = historyMap.cancelled
         steps.push({
             key: 'cancelled',
             label: 'Cancelled',
-            description: 'Order was cancelled',
-            time: order.updated_at,
+            description: h?.notes || 'Order was cancelled by customer',
+            time: h?.created_at || order.updated_at,
             icon: Ban,
             color: 'text-gray-400',
             bg: 'bg-gray-400',
@@ -63,11 +71,14 @@ function buildTimeline(order) {
 
     // Step 2: Confirmed
     const isConfirmed = ['confirmed', 'delivered'].includes(order.status)
+    const confH = historyMap.confirmed
     steps.push({
         key: 'confirmed',
         label: 'Confirmed',
-        description: isConfirmed ? 'Order confirmed by admin' : 'Awaiting confirmation',
-        time: order.confirmed_at,
+        description: isConfirmed
+            ? (confH?.notes || 'Order confirmed by administrator')
+            : 'Awaiting confirmation from staff',
+        time: confH?.created_at || order.confirmed_at,
         icon: CheckCircle,
         color: isConfirmed ? 'text-blue-500' : 'text-gray-400',
         bg: isConfirmed ? 'bg-blue-500' : 'bg-gray-600',
@@ -76,11 +87,14 @@ function buildTimeline(order) {
 
     // Step 3: Delivered
     const isDelivered = order.status === 'delivered'
+    const delH = historyMap.delivered
     steps.push({
         key: 'delivered',
         label: 'Delivered',
-        description: isDelivered ? 'Order delivered successfully' : 'Pending delivery',
-        time: order.delivered_at,
+        description: isDelivered
+            ? (delH?.notes || 'Order delivered successfully to customer')
+            : 'Pending delivery process',
+        time: delH?.created_at || order.delivered_at,
         icon: Truck,
         color: isDelivered ? 'text-emerald-500' : 'text-gray-400',
         bg: isDelivered ? 'bg-emerald-500' : 'bg-gray-600',
@@ -95,6 +109,7 @@ export default function OrderDetails() {
     const navigate = useNavigate()
     const [order, setOrder] = useState(null)
     const [items, setItems] = useState([])
+    const [history, setHistory] = useState([])
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
@@ -112,17 +127,29 @@ export default function OrderDetails() {
         if (orderError) {
             console.error('Error fetching order:', orderError)
         } else {
-            let finalOrder = orderData
-            if (orderData.delivery_address_id) {
+            let finalOrder = { ...orderData }
+
+            if (!finalOrder.customer_email && finalOrder.user_id) {
+                const { data: userData } = await supabase
+                    .from('users')
+                    .select('email')
+                    .eq('id', finalOrder.user_id)
+                    .single()
+                if (userData?.email) {
+                    finalOrder.customer_email = userData.email
+                }
+            }
+
+            if (finalOrder.delivery_address_id) {
                 const { data: addressData } = await supabase
                     .from('addresses')
                     .select('*')
-                    .eq('id', orderData.delivery_address_id)
+                    .eq('id', finalOrder.delivery_address_id)
                     .single()
 
                 if (addressData) {
                     finalOrder = {
-                        ...orderData,
+                        ...finalOrder,
                         customer_first_name: addressData.first_name,
                         customer_last_name: addressData.last_name,
                         customer_address: addressData.street_address,
@@ -133,6 +160,7 @@ export default function OrderDetails() {
             }
             setOrder(finalOrder)
 
+            // Fetch order items
             const { data: itemsData, error: itemsError } = await supabase
                 .from('order_items')
                 .select('*')
@@ -140,6 +168,14 @@ export default function OrderDetails() {
 
             if (itemsError) console.error('Error fetching items:', itemsError)
             else setItems(itemsData || [])
+
+            // Fetch history
+            const { data: historyData } = await supabase
+                .from('order_status_history')
+                .select('*')
+                .eq('order_id', id)
+                .order('created_at', { ascending: true })
+            setHistory(historyData || [])
         }
         setLoading(false)
     }
@@ -160,7 +196,17 @@ export default function OrderDetails() {
         if (error) {
             alert('Error updating status: ' + error.message)
         } else {
+            // Add to history
+            const historyEntry = {
+                order_id: id,
+                status: newStatus,
+                notes: `Status updated to ${newStatus} by admin`,
+                created_at: new Date().toISOString()
+            }
+            await supabase.from('order_status_history').insert(historyEntry)
+
             setOrder(prev => ({ ...prev, ...updatePayload }))
+            setHistory(prev => [...prev, historyEntry])
         }
     }
 
@@ -171,7 +217,7 @@ export default function OrderDetails() {
     )
     if (!order) return <div className="p-8 text-center text-red-500">Order not found.</div>
 
-    const timeline = buildTimeline(order)
+    const timeline = buildTimeline(order, history)
     const currentCfg = statusConfig[order.status] || statusConfig.pending
 
     return (
@@ -294,22 +340,22 @@ export default function OrderDetails() {
                                             </p>
                                         </div>
                                     </div>
-                                    <p className="font-medium text-gray-900 dark:text-white">${item.subtotal}</p>
+                                    <p className="font-medium text-gray-900 dark:text-white">{item.subtotal} MAD</p>
                                 </div>
                             ))}
                         </div>
                         <div className="mt-6 border-t border-gray-200 dark:border-gray-700 pt-4 space-y-2">
                             <div className="flex justify-between text-sm">
                                 <span className="text-gray-500">Subtotal</span>
-                                <span className="font-medium">${order.subtotal}</span>
+                                <span className="font-medium">{order.subtotal} MAD</span>
                             </div>
                             <div className="flex justify-between text-sm">
                                 <span className="text-gray-500">Shipping</span>
-                                <span className="font-medium">${order.shipping_cost}</span>
+                                <span className="font-medium">{order.shipping_cost} MAD</span>
                             </div>
                             <div className="flex justify-between text-base font-bold text-gray-900 dark:text-white pt-2 border-t border-gray-200 dark:border-gray-700">
                                 <span>Total</span>
-                                <span>${order.total_amount}</span>
+                                <span>{order.total_amount} MAD</span>
                             </div>
                         </div>
                     </div>
